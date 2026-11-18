@@ -13,6 +13,10 @@ _TABLES = {
     'receipts': ('batch_id', 'task_id', 'row_count'),
 }
 
+_EVIDENCE_COLUMNS = ('batch_id', 'document')
+_EVIDENCE_STATEMENT = ('CREATE TABLE evidence(batch_id TEXT PRIMARY KEY REFERENCES batches(id), '
+                       'document TEXT NOT NULL)')
+
 class ArchiveDatabase:
     def __init__(self, path=':memory:'):
         self.connection = sqlite3.connect(path, isolation_level=None)
@@ -38,6 +42,7 @@ class ArchiveDatabase:
                 'CREATE TABLE batches(id TEXT PRIMARY KEY, task_id TEXT UNIQUE NOT NULL REFERENCES tasks(id), binding TEXT NOT NULL)',
                 'CREATE TABLE result_rows(batch_id TEXT NOT NULL REFERENCES batches(id), ordinal INTEGER NOT NULL, source TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(batch_id,ordinal))',
                 'CREATE TABLE receipts(batch_id TEXT PRIMARY KEY REFERENCES batches(id), task_id TEXT UNIQUE NOT NULL REFERENCES tasks(id), row_count INTEGER NOT NULL)',
+                _EVIDENCE_STATEMENT,
             )
             with self.transaction():
                 for statement in statements:
@@ -49,6 +54,14 @@ class ArchiveDatabase:
             actual = tuple(row[1] for row in c.execute('PRAGMA table_info(' + table + ')'))
             if actual != expected:
                 raise RuntimeError('incompatible table: ' + table)
+        # Additive migration for pre-evidence v1 archives: the evidence table
+        # is created empty when missing; existing rows are never touched.
+        evidence_columns = tuple(row[1] for row in c.execute('PRAGMA table_info(evidence)'))
+        if not evidence_columns:
+            with self.transaction() as t:
+                t.execute(_EVIDENCE_STATEMENT)
+        elif evidence_columns != _EVIDENCE_COLUMNS:
+            raise RuntimeError('incompatible table: evidence')
 
     @contextmanager
     def transaction(self):

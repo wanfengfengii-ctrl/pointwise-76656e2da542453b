@@ -1,5 +1,5 @@
 import json
-from labavro.archive.reading import read_result
+from labavro.archive.reading import read_result, get_evidence_text
 from labavro.archive.representation import to_export_value
 
 def iter_json_lines(db, result_id):
@@ -15,3 +15,8 @@ def export_result(db, result_id, output):
         output.write(line)
         count += 1
     return count
+
+def export_evidence(db, result_id, output):
+    receipt, document = get_evidence_text(db, result_id)
+    output.write(document + '\n')
+    return receipt.row_count

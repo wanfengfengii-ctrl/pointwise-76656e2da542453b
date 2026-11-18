@@ -1,4 +1,5 @@
 import json
+from labavro.archive.database import ConflictError
 from labavro.archive.representation import decode_row
 from labavro.archive.publication import PublicationReceipt
 
@@ -19,3 +20,13 @@ def read_result(db, result_id):
     return {'result_id': result_id, 'binding': json.loads(batch['binding']),
             'receipt': {'task_id': receipt.task_id, 'row_count': receipt.row_count},
             'rows': [{'source': json.loads(row['source']), 'value': decode_row(row['value'])} for row in rows]}
+
+def get_evidence_text(db, result_id):
+    receipt = get_publication_receipt(db, result_id)
+    row = db.connection.execute('SELECT document FROM evidence WHERE batch_id=?', (result_id,)).fetchone()
+    if row is None:
+        raise ConflictError('result was published without evidence: ' + result_id)
+    return receipt, row['document']
+
+def read_evidence(db, result_id):
+    return json.loads(get_evidence_text(db, result_id)[1])

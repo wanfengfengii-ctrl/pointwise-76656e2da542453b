@@ -8,9 +8,13 @@ Python 3.11 标准库工程。供应实验室交付离线 Avro 对象容器，�
 python3.11 -B -m labavro.processing.execution verify
 python3.11 -B -m labavro.processing.execution demo
 python3.11 -B -m labavro.processing.execution demo --db day.sqlite
+python3.11 -B evidence_cases.py verify
+python3.11 -B evidence_cases.py demo
 ```
 
 verify 执行完整 unittest discover。demo 从 samples/day.json 导入实际字节，对照手算预期后导出真实成果。指定项目内数据库路径可封存成果；重复运行不会重置数据。完整命令参数也见 .pointwise-runtime.json 与 run-manifest.json。测试只在测试临时目录创建磁盘数据库。
+
+evidence_cases.py verify 额外执行凭据基线与联合核验（含磁盘重开与独立子进程重放），evidence_cases.py demo 展示递归与 map 重排的真实凭据及独立重放；两者是运行清单中的现行 verify/demo 命令。凭据特性见 EVIDENCE.md 与 docs/evidence.md。
 
 ## 一天的工作
 
@@ -58,8 +62,13 @@ finally:
 | register_reader(db, revision_id, schema)，schemas/catalog.py | ReaderRevision：id、schema、digest | 非法模式或 ID 异模式 SchemaError |
 | create_task(db, task_id, package_id, revision_id)，processing/tasks.py | FrozenTask：binding、state、拒收信息、result_id | 缺引用 KeyError；异绑定 ConflictError |
 | execute(db, task_id)，processing/execution.py | PublicationReceipt：result_id、task_id、row_count | ResolutionError 或 DecodeError；SQL 异常原样传播 |
+| execute_evidenced(db, task_id)，processing/execution.py | 同 execute 的回执；实验行与凭据共同发布 | 同 execute；旧成果无凭据时 ConflictError |
 | read_result(db, result_id)，archive/reading.py | result_id、binding、receipt、rows | 未发布或未知成果 KeyError |
+| read_evidence(db, result_id)，archive/reading.py | 凭据文档独立副本：双模式、逐行 entries 与 proof | 未知成果 KeyError；无凭据 ConflictError |
 | export_result(db, result_id, output)，archive/export.py | 写出的行数 | 缺成果 KeyError；输出异常原样传播 |
+| export_evidence(db, result_id, output)，archive/export.py | 成果行数；写出一个完整 JSON 文档及换行 | 同 read_evidence；输出异常原样传播 |
+
+execute_evidenced 发布的成果用 read_result/export_result 读取仍是原格式。evidence_replay.py 是脱离本包的独立重放器，仅凭凭据文档重建实验行，见 docs/evidence.md。
 
 rows 每项含 source 和 value。source 含 package_id、从 0 连续的 ordinal、block_index、record_index。binding 固定 package_id、package_digest、writer_schema_digest、reader_id、reader_digest。receipt 含 task_id 和 row_count。record 为保留字段顺序的 dict，map 按键排序，数组为 list，二进制为 bytes，联合为 schemas.types.UnionValue(branch_index, branch_type, value)。
 
@@ -75,6 +84,6 @@ SourcePackage 的 sealed 表示原字节已固定，不代表数据块已通过�
 
 ## 模块与回归
 
-24 个生产模块均接入公开业务路径。sources 的 packages/catalog/container/blocks 管封存和容器；schemas 的 catalog/names/types/defaults/resolution 管固定类型与配对；decoding 的 cursor/primitives/collections/unions/records/reader 管写端消费和读端构造；processing 的 tasks/validation/outcomes/execution 管任务和整批状态；archive 的 database/representation/publication/reading/export 管共同发布及固定交付。详细规则与手算字节见 docs/rules.md。
+26 个生产模块均接入公开业务路径。sources 的 packages/catalog/container/blocks 管封存和容器；schemas 的 catalog/names/types/defaults/resolution 管固定类型与配对；decoding 的 cursor/primitives/collections/unions/records/reader 管写端消费和读端构造；processing 的 tasks/validation/outcomes/execution 管任务和整批状态；archive 的 database/representation/publication/reading/export 管共同发布及固定交付；evidence 的 tracked/document 管带凭据解码与凭据文档发布。详细规则与手算字节见 docs/rules.md，凭据格式与不变量见 docs/evidence.md。
 
-五个测试文件覆盖来源冲突与冻结、递归别名与缺省、联合身份与损坏块、SQL 触发器制造的真实事务失败、重开与导出。tests/fixtures.py 是独立的有限编码夹具，不调用生产解码或解析生成预期。完整 discover 保留所有测试，指定方法的核验只是补充分组。无压缩、逻辑类型、单位换算、外部注册服务、并发调度或流式单记录承诺。
+六个测试文件覆盖来源冲突与冻结、递归别名与缺省、联合身份与损坏块、SQL 触发器制造的真实事务失败、重开与导出、凭据一致性与篡改边界。tests/fixtures.py 是独立的有限编码夹具，不调用生产解码或解析生成预期。完整 discover 保留所有测试，指定方法的核验只是补充分组。无压缩、逻辑类型、单位换算、外部注册服务、并发调度或流式单记录承诺。

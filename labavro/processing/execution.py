@@ -16,9 +16,11 @@ from labavro.processing.tasks import create_task, get_task
 from labavro.processing.validation import BatchValidator
 from labavro.processing.outcomes import record_rejection, mark_published, raise_rejection
 from labavro.archive.publication import publish_batch
-from labavro.archive.reading import read_result, get_publication_receipt
+from labavro.archive.reading import read_result, get_publication_receipt, get_evidence_text
 from labavro.archive.export import export_result
 from labavro.archive.representation import to_export_value
+from labavro.evidence.tracked import EvidenceValidator, decode_block_tracked
+from labavro.evidence.document import build_document, serialize_document, publish_evidence
 
 def execute(db, task_id):
     task = get_task(db, task_id)
@@ -44,6 +46,32 @@ def execute(db, task_id):
         record_rejection(db, task_id, exc)
         raise
     return publish_batch(db, task_id, candidate, mark_published)
+
+def execute_evidenced(db, task_id):
+    task = get_task(db, task_id)
+    if task.state == 'published':
+        return get_evidence_text(db, task.result_id)[0]
+    if task.state == 'rejected':
+        raise_rejection(task)
+    package = get_package(db, task.binding['package_id'])
+    reader = get_reader(db, task.binding['reader_id'])
+    if (package.digest != task.binding['package_digest'] or
+        package.schema_digest != task.binding['writer_schema_digest'] or
+        reader.digest != task.binding['reader_digest']):
+        raise RuntimeError('frozen input corruption')
+    try:
+        plan = compile_resolution(build_schema(package.writer_schema), build_schema(reader.schema))
+        validator = EvidenceValidator(task.binding)
+        for block in iter_blocks(package.raw, package.header):
+            validator.begin_block(block)
+            for record in decode_block_tracked(block, plan):
+                validator.add_record(record)
+        candidate = validator.finish()
+    except (ResolutionError, DecodeError) as exc:
+        record_rejection(db, task_id, exc)
+        raise
+    document = build_document(task_id, candidate, package.writer_schema, reader.schema)
+    return publish_evidence(db, task_id, candidate, serialize_document(document), mark_published)
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Northbank laboratory exchange')
