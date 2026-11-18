@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "verify": ["python3.11", "-B", "-m", "labavro.processing.execution", "verify"],
+  "demo": ["python3.11", "-B", "-m", "labavro.processing.execution", "demo"]
+}

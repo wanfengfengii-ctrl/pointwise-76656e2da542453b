@@ -1,0 +1,12 @@
+{
+  "writer_schema": {"type":"record","name":"Node","namespace":"lab","fields":[{"name":"discard","type":{"type":"array","items":"int"}},{"name":"reading","type":["int","long"]},{"name":"next","type":["null","lab.Node"]}]},
+  "reader_r1": {"type":"record","name":"Record","namespace":"center","aliases":["lab.Node"],"fields":[{"name":"next","type":["null","center.Record"],"default":null},{"name":"signal","aliases":["reading"],"type":["int","double"]},{"name":"note","type":"string","default":"checked"}]},
+  "reader_r2": {"type":"record","name":"Compact","namespace":"center","aliases":["lab.Node"],"fields":[{"name":"measurement","aliases":["reading"],"type":"double"},{"name":"status","type":"string","default":"reviewed"}]},
+  "payload_hex": "03040e1000000a0200020a00020100021200",
+  "container_hex": "4f626a0104166176726f2e736368656d6192037b2274797065223a227265636f7264222c226e616d65223a224e6f6465222c226e616d657370616365223a226c6162222c226669656c6473223a5b7b226e616d65223a2264697363617264222c2274797065223a7b2274797065223a226172726179222c226974656d73223a22696e74227d7d2c7b226e616d65223a2272656164696e67222c2274797065223a5b22696e74222c226c6f6e67225d7d2c7b226e616d65223a226e657874222c2274797065223a5b226e756c6c222c226c61622e4e6f6465225d7d5d7d146176726f2e636f646563086e756c6c00000102030405060708090a0b0c0d0e0f042403040e1000000a0200020a00020100021200000102030405060708090a0b0c0d0e0f",
+  "expected_r1": [
+    {"next":{"branch_index":1,"branch_type":"center.Record","value":{"next":{"branch_index":0,"branch_type":"null","value":null},"signal":{"branch_index":1,"branch_type":"double","value":5},"note":"checked"}},"signal":{"branch_index":0,"branch_type":"int","value":5},"note":"checked"},
+    {"next":{"branch_index":0,"branch_type":"null","value":null},"signal":{"branch_index":1,"branch_type":"double","value":9},"note":"checked"}
+  ],
+  "expected_r2": [{"measurement":5,"status":"reviewed"},{"measurement":9,"status":"reviewed"}]
+}
